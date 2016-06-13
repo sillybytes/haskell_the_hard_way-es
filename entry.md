@@ -452,3 +452,186 @@ El compilador se queja. Los dos parámetros deben ser del mismo tipo.
 Si piensas que esto es una mala idea, y que el compilador debería hacer la
 transformación de un tipo al otro por ti, deberías ver este fantástico
 (y divertido) vídeo: [WAT](https://www.destroyallsoftware.com/talks/wat)
+
+
+# Haskell esencial
+
+![](http://yannesposito.com/Scratch/img/blog/Haskell-the-Hard-Way/kandinsky_gugg.jpg)
+
+Sugiero que leas con ligereza esta parte. Mírala como una referencia. Haskell
+tiene un montón de características. Regresa aquí cada vez que la notación
+te parezca extraña.
+
+Uso el símbolo `⇔` para indicar que dos expresiones son equivalentes. Es una
+meta notación, `⇔` no existe en Haskell. También usaré `⇒` para indicar
+cual es el valor de retorno de una expresión.
+
+
+## Notaciones
+
+**Aritmética**
+
+    3 + 2 * 6 / 3 ⇔ 3 + ((2*6)/3)
+
+
+**Lógica**
+
+    True || False ⇒ True
+    True && False ⇒ False
+    True == False ⇒ False
+    True /= False ⇒ True  (/=) es el operador diferencia
+
+
+**Potencias**
+
+    x^n     para un n entero (Int o Integer)
+    x**y    para cualquier tipo de numero y (como un Float)
+
+`Integer` no tiene ningún limite además de la capacidad de tu máquina.
+
+    4^103
+    102844034832575377634685573909834406561420991602098741459288064
+
+
+Si! También hay números racionales! Pero hay que importar el modulo
+`Data.Ratio`:
+
+    $ ghci
+    ....
+    Prelude> :m Data.Ratio
+    Data.Ratio> (11 % 15) * (5 % 3)
+    11 % 9
+
+
+**Listas**
+
+    []                      ⇔ Lista vacia
+    [1,2,3]                 ⇔ Lista de enteros
+    ["foo","bar","baz"]     ⇔ Lista de cadenas
+    1:[2,3]                 ⇔ [1,2,3], (:) anteponer un elemento
+    1:2:[]                  ⇔ [1,2]
+    [1,2] ++ [3,4]          ⇔ [1,2,3,4], (++) concatenar
+    [1,2,3] ++ ["foo"]      ⇔ ERROR String ≠ Integral
+    [1..4]                  ⇔ [1,2,3,4]
+    [1,3..10]               ⇔ [1,3,5,7,9]
+    [2,3,5,7,11..100]       ⇔ ERROR! No soy tan inteligente!
+    [10,9..1]               ⇔ [10,9,8,7,6,5,4,3,2,1]
+
+
+**Cadenas**
+
+En Haskell las cadenas son listas de `Char`.
+
+    'a' :: Char
+    "a" :: [Char]
+    ""  ⇔ []
+    "ab" ⇔ ['a','b'] ⇔  'a':"b" ⇔ 'a':['b'] ⇔ 'a':'b':[]
+    "abc" ⇔ "ab"++"c"
+
+
+    En código real no se debería usar una lista de `Char` para
+    representar texto. Se debería usar `Data.Text`. Si quieres
+    representar un flujo de caracteres ASCII, deberías usar
+    `Data.ByteString`.
+
+
+**Tuplas**
+
+El tipo de una tupla es `(a,b)`. Los elementos dentro de una tupla pueden
+tener diferentes tipos.
+
+    -- Todas estas tuplas son validas
+    (2,"foo")
+    (3,'a',[2,3])
+    ((2,"a"),"c",3)
+
+    fst (x,y)       ⇒  x
+    snd (x,y)       ⇒  y
+
+    fst (x,y,z)     ⇒  ERROR: fst :: (a,b) -> a
+    snd (x,y,z)     ⇒  ERROR: snd :: (a,b) -> b
+
+
+**Controlar los paréntesis**
+
+Para remover algunos paréntesis se pueden usar dos funciones: `($)` y `(.)`.
+
+    -- Por defecto:
+    f g h x         ⇔  (((f g) h) x)
+
+    -- el $ reemplaza los paréntessis desde el $
+    -- hasta el final de la expresión
+    f g $ h x       ⇔  f g (h x) ⇔ (f g) (h x)
+    f $ g h x       ⇔  f (g h x) ⇔ f ((g h) x)
+    f $ g $ h x     ⇔  f (g (h x))
+
+    -- (.) composición de funciones
+    (f . g) x       ⇔  f (g x)
+    (f . g . h) x   ⇔  f (g (h x))
+
+
+## Notaciones útiles para funciones
+
+Solo un recordatorio:
+
+    x :: Int            ⇔ x es de tipo Int
+    x :: a              ⇔ x puede ser de cualquier tipo
+    x :: Num a => a     ⇔ x puede ser cualquier tipo a
+                        que pertenezca a la class de typo Num
+    f :: a -> b         ⇔ f es una función de a hacia b
+    f :: a -> b -> c    ⇔ f es una función de a hacia (b→c)
+    f :: (a -> b) -> c  ⇔ f es una función de (a→b) hacia c
+
+Recuerda que definir el tipo de una función antes de su declaración no es
+obligatorio. Haskell infiere el tipo más general por ti. Pero es
+considerado una buena practica hacerlo de todos modos.
+
+
+**Notación infijo**
+
+
+```Haskell
+square :: Num a => a -> a
+square x = x^2
+```
+
+Nótese que `^` usa notación infijo. Para cada operador infijo hay una notación
+prefijo asociada. Solo debe ponerse entre paréntesis.
+
+```Haskell
+square' x = (^) x 2
+square'' x = (^2) x
+```
+
+Podemos remover `x` en el lado izquierdo y derecho!
+Eso se llama reducción  η.
+
+```Haskell
+square''' = (^2)
+```
+
+Nótese que podemos declarar funciones con un `'` en su nombre:
+
+    square ⇔ square' ⇔ square'' ⇔ square'''
+
+
+**Tests**
+
+```Haskell
+absolute :: (Ord a, Num a) => a -> a
+absolute x = if x >= 0 then x else -x
+```
+
+Nota: el `if .. then .. else` en Haskell es como el `algo ? algo : algo` en C.
+No puedes olvidar el `else`
+
+Otra versión equivalente:
+
+```Haskell
+absolute' x
+    | x >= 0 = x
+    | otherwise = -x
+```
+
+    Advertencia: la indentación es importante en Haskell. Como en
+    Python, una mala indentación pueden dañar el código!
