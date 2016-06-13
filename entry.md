@@ -68,3 +68,84 @@ El artículo contiene cinco partes:
 ## Instalación
 
 ![](http://yannesposito.com/Scratch/img/blog/Haskell-the-Hard-Way/Haskell-logo.png)
+
+* [La plataforma de Haskell](https://www.haskell.org/platform/) es la forma
+  estándar de instalar Haskell.
+
+Herramientas:
+
+`ghc`: Compilador similar a *gcc* para `C`.
+`ghci`: Haskell interactivo (REPL)
+`runhaskell`: Ejecutar un programa sin compilarlo. Conveniente pero muy lento
+    comparado a programas compilados
+
+## No tengas miedo
+
+![](http://yannesposito.com/Scratch/img/blog/Haskell-the-Hard-Way/munch_TheScream.jpg)
+
+Muchos libros/artículos sobre Haskell empiezan por introducir alguna formula
+esotérica (quick sort, Fibonacci, etc...). Yo lo haré justamente al revés. Al
+principio no mostraré ningún super poder de Haskell. Empezaré por las
+similaridades entre Haskell y otros lenguajes de programación. Saltemos al "Hola
+Mundo" obligatorio.
+
+```Haskell
+main = putStrLn "Hola Mundo!"
+```
+
+Para ejecutarlo, puedes guardar el código en un fichero `hola.hs` y:
+
+    $ runhaskell ./hola.hs
+    Hola Mundo!
+
+
+Ahora, un programa que pregunte tu nombre y responda "Hola" usando el nombre
+ingresado:
+
+```Haskell
+main = do
+    print "Cuál es tu nombre?"
+    name <- getLine
+    print ("Hola " ++ name ++ "!")
+```
+
+Primero, comparemos esto con programas similares en algunos lenguajes
+imperativos:
+
+
+```Python
+# Python
+print "What is your name?"
+name = raw_input()
+print "Hello %s!" % name
+```
+
+```Ruby
+# Ruby
+puts "What is your name?"
+name = gets.chomp
+puts "Hello #{name}!"
+```
+
+```C
+// In C
+#include <stdio.h>
+int main (int argc, char **argv) {
+    char name[666]; // <- An Evil Number!
+    // What if my name is more than 665 character long?
+    printf("What is your name?\n");
+    scanf("%s", name);
+    printf("Hello %s!\n", name);
+    return 0;
+}
+```
+
+La estructura es la misma, pero hay diferencias en la sintaxis. La parte
+principal de este tutorial será dedicada a explicar por qué.
+
+En Haskell hay una función `main` y todo objeto tiene un tipo. El tipo de
+`main` es `IO ()`. Esto significa que `main` causará efectos
+secundarios.
+
+Solamente recuerda que Haskell puede lucir mucho como los lenguajes
+imperativos populares.
