@@ -1106,3 +1106,119 @@ puede ser difícil entender dónde y cómo usarlo.
 
 Pero antes de hablar sobre este super poder de Haskell, debemos hablar
 sobre otro aspecto esencial de Haskell: Tipos.
+
+
+## Tipos
+
+![](http://yannesposito.com/Scratch/img/blog/Haskell-the-Hard-Way/salvador-dali-the-madonna-of-port-lligat.jpg)
+
+TL;DR\*:
+
+- `type Nombre = OtroTipo` es solamente un alias y no hay ninguna diferencia
+  entre `Nombre` y `OtroTipo`.
+
+- `data Nombre = NombreConstructor OtroTipo` tiene diferencia
+
+- `data` puede construir estructuras que pueden ser recursivas
+
+- `deriving` es mágico y crea funciones por ti
+
+
+En Haskell, los tipos son fuertes y estáticos.
+
+Por qué es importante? Permitirá en *gran* medida evitar errores. En Haskell, la
+mayoría de los errores se capturan durante la compilación del programa. Y
+la razón principal es debido a la inferencia de tipos durante la
+compilación. La inferencia de tipos hace sencillo detectar donde se usó el
+parámetro incorrecto en el lugar incorrecto, por ejemplo.
+
+
+### Inferencia de tipos
+
+El tipado estático es generalmente esencial para la ejecución veloz. Pero
+la mayoría de lenguajes estáticamente tipado son malos generalizando
+conceptos. La ventaja de Haskell es su capacidad para inferir tipos.
+
+Aquí un ejemplo simple, la función `square` en Haskell:
+
+```Haskell
+square x = x * x
+```
+
+Esta función puede elevar al cuadrado cualquier tipo Numérico. Se puede pasar
+a `square` un `Int`, un `Integer`, un `Float`, un `Fractional` e incluso un
+`Complex`. Por ejemplo:
+
+    % ghci
+    GHCi, version 7.0.4:
+    ...
+    Prelude> let square x = x*x
+    Prelude> square 2
+    4
+    Prelude> square 2.1
+    4.41
+    Prelude> -- load the Data.Complex module
+    Prelude> :m Data.Complex
+    Prelude Data.Complex> square (2 :+ 1)
+    3.0 :+ 4.0
+
+`x :+ y` es la notación para el complejo (x + iy).
+
+Ahora compáralo con la cantidad de código necesario en `C`:
+
+```C
+int     int_square(int x) { return x*x; }
+
+float   float_square(float x) {return x*x; }
+
+complex complex_square (complex z) {
+    complex tmp;
+    tmp.real = z.real * z.real - z.img * z.img;
+    tmp.img = 2 * z.img * z.real;
+}
+
+complex x,y;
+y = complex_square(x);
+```
+
+Para cada tipo, se necesita escribir una nueva función. La única forma de
+solucionar esto es usando algún truco de meta-programación, por ejemplo
+usando el pre-procesador. En C++ hay una mejor forma usando templates:
+
+```CPP
+#include <iostream>
+#include <complex>
+using namespace std;
+
+template<typename T>
+T square(T x)
+{
+    return x*x;
+}
+
+int main() {
+    // int
+    int sqr_of_five = square(5);
+    cout << sqr_of_five << endl;
+    // double
+    cout << (double)square(5.3) << endl;
+    // complex
+    cout << square( complex<double>(5,3) )
+         << endl;
+    return 0;
+}
+```
+
+C++ lo hace mucho mejor que C en este aspecto. Pero para funciones más
+complejas la sintaxis puede ser dificil de entender: Mira [este
+artículo](http://bartoszmilewski.com/2009/10/21/what-does-haskell-have-to-do-with-c/)
+por ejemplo.
+
+En C++ se debe declarar que la función puede trabajar con distintos tipos. En
+Haskell, es lo opuesto. La función será lo más general posible por defecto.
+
+La inferencia de tipos le da a Haskell la sensación de libertad de los
+lenguajes de tipado dinámico. Pero a diferencia de estos, la mayoría de los
+errores se encuentra antes de la ejecución. Generalmente, en Haskell:
+
+> "Si compila entonces hace lo que quiere que hagas"
