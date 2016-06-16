@@ -865,4 +865,244 @@ foo (x:xs) = if even x
 Esto es una característica muy útil. Hace nuestro código más conciso y fácil de
 leer.
 
-En Haskell se puede simplificar
+En Haskell se puede simplificar las definiciones de las funciones usando
+reducción η. Por ejemplo, en lugar de escribir:
+
+```Haskell
+f x = (una expresion) x
+```
+
+Se puede escribir
+
+```Haskell
+f = una expression
+```
+
+Usamos este método para remover el `l`:
+
+```Haskell
+-- Version 4
+evenSum :: Integral a => [a] -> a
+
+evenSum = accumSum 0
+    where
+        accumSum n [] = n
+        accumSum n (x:xs) =
+             if even x
+                then accumSum (n+x) xs
+                else accumSum n xs
+
+```
+
+
+### Funciones de orden superior
+
+![](http://yannesposito.com/Scratch/img/blog/Haskell-the-Hard-Way/escher_polygon.png)
+
+Para mejorarlo aún más podemos usar funciones de orden superior. Qué son esas
+bestias? Las funciones de orden superior son funciones que toman funciones
+como parámetros.
+
+Aquí algunos ejemplos:
+
+```Haskell
+filter :: (a -> Bool) -> [a] -> [a]
+map :: (a -> b) -> [a] -> [b]
+foldl :: (a -> b -> a) -> a -> [b] -> a
+```
+
+Procedamos con pequeños pasos.
+
+```Haskell
+-- Version 5
+evenSum l = mysum 0 (filter even l)
+    where
+      mysum n [] = n
+      mysum n (x:xs) = mysum (n+x) xs
+```
+
+Donde
+
+```Haskell
+filter even [1..10] ⇔  [2,4,6,8,10]
+```
+
+La función `filter` toma una función de tipo (`a -> Bool`) y una lista de
+tipo `[a]`. Retorna una lista que contiene solamente los elementos para los
+cuales la función retornó `true`.
+
+El siguiente paso es usar otra tecnica para lograr el mismo resultado que un
+loop. Usaremos la función `foldl` para acumular los valores mientras recorremos
+la lista. La función `foldl` captura un patrón común:
+
+```Haskell
+myfunc list = foo initialValue list
+foo accumulated []     = accumulated
+foo tmpValue    (x:xs) = foo (bar tmpValue x) xs
+```
+
+Que se puede reemplazar con:
+
+```Haskell
+myfunc list = foldl bar initialValue list
+```
+
+If you really want to know how the magic works, here is the definition of foldl:
+Si realmente quieres saber como funciona la magia, aquí está la definición
+de `foldl`:
+
+```Haskell
+foldl f z [] = z
+foldl f z (x:xs) = foldl f (f z x) xs
+```
+
+```Haskell
+foldl f z [x1,...xn]
+⇔  f (... (f (f z x1) x2) ...) xn
+```
+
+Pero como Haskell es *perezoso*, no evalúa `(f z x)` y simplemente lo empuja en
+la pila. Por eso generalmente usamos `foldl'` en lugar de `foldl`; `foldl'`
+es una versión estricta de `foldl`. Si no comprendes que significa *perezoso*
+o *estricto*, no te preocupes, solo sigue el código como si `fold` y `foldl'`
+fueran idénticos.
+
+Ahora la nueva versión de `evenSum` será:
+
+```Haskell
+-- Version 6
+-- foldl' isn't accessible by default
+-- we need to import it from the module Data.List
+import Data.List
+evenSum l = foldl' mysum 0 (filter even l)
+  where mysum acc value = acc + value
+```
+
+También podemos simplificar eso usando notación lambda. Así no tendremos
+que crear un nombre temporal `mysum`.
+
+```Haskell
+-- Version 7
+-- Generally it is considered a good practice
+-- to import only the necessary function(s)
+import Data.List (foldl')
+evenSum l = foldl' (\x y -> x+y) 0 (filter even l)
+```
+
+Y por supuesto, notamos que
+
+`(\x y -> x+y) ⇔ (+)`
+
+
+Finalmente
+
+```Haskell
+-- Version 8
+import Data.List (foldl')
+evenSum :: Integral a => [a] -> a
+evenSum l = foldl' (+) 0 (filter even l)
+```
+
+`foldl'` no es la función más sencilla de comprender. Si no estas
+acostumbrado, deberías estudiarlo un poco.
+
+Para ayudar a comprender que está sucediendo aquí, miremos la evaluación
+paso por paso:
+
+    evenSum [1,2,3,4]
+    ⇒ foldl' (+) 0 (filter even [1,2,3,4])
+    ⇒ foldl' (+) 0 [2,4]
+    ⇒ foldl' (+) (0+2) [4]
+    ⇒ foldl' (+) 2 [4]
+    ⇒ foldl' (+) (2+4) []
+    ⇒ foldl' (+) 6 []
+    ⇒ 6
+
+Otra función de orden superior útil es `(.)`. La función `(.)` corresponde
+a la composición matemática de funciones.
+
+
+`(f . g . h) x ⇔  f ( g (h x))`
+
+Podemos tomar ventaja de este operador para hacer una reducción η en nuestra
+función:
+
+```Haskell
+-- Version 9
+import Data.List (foldl')
+evenSum :: Integral a => [a] -> a
+evenSum = (foldl' (+) 0) . (filter even)
+```
+
+También, podemos renombrar algunas partes para hacerlo más claro:
+
+```Haskell
+-- Version 10
+import Data.List (foldl')
+sum' :: (Num a) => [a] -> a
+sum' = foldl' (+) 0
+evenSum :: Integral a => [a] -> a
+evenSum = sum' . (filter even)
+```
+
+Es tiempo de hablar sobre la dirección hacia la cual se ha movido nuestro
+código mientras introducimos más de la forma funcional. Qué hemos ganado al
+usar funciones de orden superior?
+
+
+Al principio podrías pensar que la principal diferencia es la brevedad.
+Pero en realidad tiene más que ver con la forma en la que se piensa. Supongamos
+que se quiere modificar un poco la función, por ejemplo, para obtener la
+suma de los cuadrados de los elementos pares de la lista.
+
+```Haskell
+[1,2,3,4] ▷ [1,4,9,16] ▷ [4,16] ▷ 20
+```
+
+Actualizar la versión 10 es muy fácil:
+
+
+```Haskell
+squareEvenSum = sum' . (filter even) . (map (^2))
+squareEvenSum' = evenSum . (map (^2))
+```
+
+Solamente agregamos otra "función de transformación".
+
+```Haskell
+map (^2) [1,2,3,4] ⇔ [1,4,9,16]
+```
+
+La función `map` simplemente aplica una función sobre todos los elementos
+de una lista.
+
+No tuvimos que modificar nada *dentro* de la definición de la función.
+Esto hace el código más modular. Pero también permite pensar en la función de
+forma más matemática. También se puede usar la función
+intercambiablemente con otras, según se necesite. Esto es, se puede hacer
+compose, map, fold, filter usando la nueva función.
+
+Modificar la versión 1 se deja como ejercicio para el lector ☺.
+
+Si piensas que hemos llegado al final de la generalización, entonces enterate
+que estas muy equivocado. Por ejemplo, hay una forma de usar esta fucnion no
+solo en listas, sino ademas sobre cualquier tipo recursivo. Si quieres
+saber como, recomiendo que leas este
+[artículo](http://eprints.eemcs.utwente.nl/7281/01/db-utwente-40501F46.pdf)
+
+Este ejemplo debería demostrar cuan genial es la programación funcional.
+Desafortunadamente, usar programación funcional pura no es adecuado para todos
+los usos. O al menos un lenguaje que lo permite no se a logrado aún.
+
+Uno de los mayores poderes de Haskell es la habilidad de crear DSLs (Lenguaje
+de dominio específico) haciendo sencillo cambiar el paradigma de
+programación.
+
+De echo, Haskell también es grandioso cuando se quiere escribir en estilo
+imperativo. Comprender esto fue muy difícil para mi cuando aprendía Haskell.
+Gran parte del esfuerzo se va intentando explicar la superioridad del enfoque
+funcional. Luego cuando empiezas a usar estilo imperativo con Haskell,
+puede ser difícil entender dónde y cómo usarlo.
+
+Pero antes de hablar sobre este super poder de Haskell, debemos hablar
+sobre otro aspecto esencial de Haskell: Tipos.
