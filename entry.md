@@ -1319,3 +1319,55 @@ z = Complex { real = 3, img = 4 }
 real c ⇒ 1.0
 img z ⇒ 4
 ```
+
+
+### Tipos recursivos
+
+Ya nos hemos topado con un tipo recursivo: listas. Se pueden re-crear
+listas, pero con una sintaxis más explicita:
+
+```Haskell
+data List a = Empty | Cons a (List a)
+```
+
+Si prefieres usar una sintaxis más simple, se puede usar un nombre infijo para
+los constructores.
+
+```Haskell
+infixr 5 :::
+data List a = Nil | a ::: (List a)
+```
+
+El numero luego de `infixr` le da la precedencia.
+
+Si quieres poder imprimir por pantalla (`Show`), leer (`Read`), probar
+igualdad (`Eq`) y comparar (`Ord`) con tu nueva estructura de datos puedes
+pedirle a Haskell que derive las funciones apropiadas por ti.
+
+```Haskell
+infixr 5 :::
+data List a = Nil | a ::: (List a)
+              deriving (Show,Read,Eq,Ord)
+```
+
+Cuando añades `deriving (Show)` a tu declaración de datos, Haskell crea una
+función `show` por ti. Ya veremos como se puede usar una función `show`
+propia.
+
+```Haskell
+convertList [] = Nil
+convertList (x:xs) = x ::: convertList xs
+```
+
+```Haskell
+main = do
+      print (0 ::: 1 ::: Nil)
+      print (convertList [0,1])
+```
+
+Esto imprime:
+
+```Haskell
+0 ::: (1 ::: Nil)
+0 ::: (1 ::: Nil)
+```
