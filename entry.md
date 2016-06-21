@@ -1221,4 +1221,101 @@ La inferencia de tipos le da a Haskell la sensación de libertad de los
 lenguajes de tipado dinámico. Pero a diferencia de estos, la mayoría de los
 errores se encuentra antes de la ejecución. Generalmente, en Haskell:
 
-> "Si compila entonces hace lo que quiere que hagas"
+> "Si compila entonces hace lo que quieres que haga"
+
+
+### Construcción de tipos
+
+Es posible construir tipos propios. Primero, se pueden usar alias o sinónimos de
+tipos.
+
+```Haskell
+type Name   = String
+type Color  = String
+
+showInfos :: Name ->  Color -> String
+showInfos name color =  "Name: " ++ name
+                        ++ ", Color: " ++ color
+name :: Name
+name = "Robin"
+color :: Color
+color = "Blue"
+main = putStrLn $ showInfos name color
+```
+
+Pero esto no te protege mucho. Intenta intercambiar los dos parámetros de
+`showInfos` y ejecuta el programa:
+
+    putStrLn $ showInfos color name
+
+
+Se compilará y ejecutará. De echo se pueden reemplazar `Name`, `Color` y
+`String` con cualquier cosa. El compilador los tratará como si fueran
+idénticos.
+
+Otro método es crear tus propios tipos usando la palabra reservada `data`.
+
+
+```Haskell
+data Name   = NameConstr String
+data Color  = ColorConstr String
+
+showInfos :: Name ->  Color -> String
+showInfos (NameConstr name) (ColorConstr color) =
+      "Name: " ++ name ++ ", Color: " ++ color
+
+name  = NameConstr "Robin"
+color = ColorConstr "Blue"
+main = putStrLn $ showInfos name color
+```
+
+Ahora si intercambias los parámetros de `showInfos`, el compilador se queja!
+De forma que nunca más podrás cometer un error de ese tipo y el único
+precio es ser un poco más explicito.
+
+También nota que los constructores son funciones:
+
+```Haskell
+NameConstr  :: String -> Name
+ColorConstr :: String -> Color
+```
+
+La sintaxis de `data` es principalmente:
+
+```Haskell
+data TypeName =   ConstructorName  [types]
+                | ConstructorName2 [types]
+                | ...
+```
+
+Generalmente se usa el mismo nombre para el `DataTypeName` y para el
+`DataTypeConstructor`.
+
+Ejemplo:
+
+```Haskell
+data Complex a = Num a => Complex a a
+```
+
+También se puede usar sintaxis record:
+
+```Haskell
+data DataTypeName = DataConstructor {
+                      field1 :: [type of field1]
+                    , field2 :: [type of field2]
+                    ...
+                    , fieldn :: [type of fieldn] }
+```
+
+Y hay varios accesores disponibles. Además se puede usar otro orden cuando se
+asignen valores.
+
+Ejemplo:
+
+```Haskell
+data Complex a = Num a => Complex { real :: a, img :: a}
+c = Complex 1.0 2.0
+z = Complex { real = 3, img = 4 }
+real c ⇒ 1.0
+img z ⇒ 4
+```
