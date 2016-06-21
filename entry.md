@@ -1371,3 +1371,254 @@ Esto imprime:
 0 ::: (1 ::: Nil)
 0 ::: (1 ::: Nil)
 ```
+
+
+### Arboles
+
+![](http://yannesposito.com/Scratch/img/blog/Haskell-the-Hard-Way/magritte-l-arbre.jpg)
+
+Otro ejemplo estándar: arboles binarios.
+
+```Haskell
+import Data.List
+
+data BinTree a = Empty
+                 | Node a (BinTree a) (BinTree a)
+                              deriving (Show)
+```
+
+También crearemos una función que convierta una lista en un árbol binario
+ordenado.
+
+```Haskell
+treeFromList :: (Ord a) => [a] -> BinTree a
+treeFromList [] = Empty
+treeFromList (x:xs) = Node x (treeFromList (filter (<x) xs))
+                             (treeFromList (filter (>x) xs))
+```
+
+Observa cuan elegante es esta función.
+
+* Una lista vacía será convertida en un árbol vació.
+* Una lista `(x:xs)` será convertida en un árbol donde:
+** La raíz es `x`
+** El sub-árbol de la izquierda es el árbol creado de los miembros de la lista
+** `xs` que son menores a `x` y
+** El sub-árbol de la derecha es el árbol creado de los miembros de la lista `xs`
+** que son mayores que `x`.
+
+```Haskell
+main = print $ treeFromList [7,2,4,8]
+```
+
+Deberías obtener lo siguiente:
+
+```Haskell
+Node 7 (Node 2 Empty (Node 4 Empty Empty)) (Node 8 Empty Empty)
+```
+
+Esta es una forma informativa pero no muy agradable de nuestro árbol.
+
+Solo por diversión, hagamos que nuestros arboles se visualicen de una mejor
+forma. Simplemente resulta divertido hacer una función para mostrar arboles en
+una forma general. Puedes saltarte esta parta si te parece muy difícil.
+
+Tenemos unos cuantos cambios que hacer. Remover el `deriving (Show)` de la
+declaración del tipo `BinTree`. Y también sería útil hacer nuestras propias
+infancias de (`Eq` y `Ord`) de forma que podamos probar igualdad y comprar
+arboles.
+
+```Haskell
+data BinTree a = Empty
+                 | Node a (BinTree a) (BinTree a)
+                  deriving (Eq,Ord)
+```
+
+Sin el `deriving (Show)`, Haskell no creará una función `show` por nosotros.
+Crearemos nuestra propia versión de `show`. Para lograrlo, debemos declarar
+que nuestro nuevo tipo `BinTree a` es una instancia de la clase de tipo
+`Show`. La sintaxis general es:
+
+```Haskell
+instance Show (BinTree a) where
+   show t = ... -- You declare your function here
+```
+
+Aquí está mi versión de como mostrar un árbol binario. No te preocupes
+de la aparente complejidad. Hice un montón de mejoras para mostrar incluso
+objetos extraños.
+
+```Haskell
+-- declare BinTree a to be an instance of Show
+instance (Show a) => Show (BinTree a) where
+  -- will start by a '<' before the root
+  -- and put a : a begining of line
+  show t = "< " ++ replace '\n' "\n: " (treeshow "" t)
+    where
+    -- treeshow pref Tree
+    --   shows a tree and starts each line with pref
+    -- We don't display the Empty tree
+    treeshow pref Empty = ""
+    -- Leaf
+    treeshow pref (Node x Empty Empty) =
+                  (pshow pref x)
+
+    -- Right branch is empty
+    treeshow pref (Node x left Empty) =
+                  (pshow pref x) ++ "\n" ++
+                  (showSon pref "`--" "   " left)
+
+    -- Left branch is empty
+    treeshow pref (Node x Empty right) =
+                  (pshow pref x) ++ "\n" ++
+                  (showSon pref "`--" "   " right)
+
+    -- Tree with left and right children non empty
+    treeshow pref (Node x left right) =
+                  (pshow pref x) ++ "\n" ++
+                  (showSon pref "|--" "|  " left) ++ "\n" ++
+                  (showSon pref "`--" "   " right)
+
+    -- shows a tree using some prefixes to make it nice
+    showSon pref before next t =
+                  pref ++ before ++ treeshow (pref ++ next) t
+
+    -- pshow replaces "\n" by "\n"++pref
+    pshow pref x = replace '\n' ("\n"++pref) (show x)
+
+    -- replaces one char by another string
+    replace c new string =
+      concatMap (change c new) string
+      where
+          change c new x
+              | x == c = new
+              | otherwise = x:[] -- "x"
+```
+
+El método `treeFromList` permanece idéntico.
+
+```Haskell
+treeFromList :: (Ord a) => [a] -> BinTree a
+treeFromList [] = Empty
+treeFromList (x:xs) = Node x (treeFromList (filter (<x) xs))
+                             (treeFromList (filter (>x) xs))
+```
+
+Y ahora, podemos jugar:
+
+```Haskell
+main = do
+  putStrLn "Int binary tree:"
+  print $ treeFromList [7,2,4,8,1,3,6,21,12,23]
+```
+
+    Int binary tree:
+    < 7
+    : |--2
+    : |  |--1
+    : |  `--4
+    : |     |--3
+    : |     `--6
+    : `--8
+    :    `--21
+    :       |--12
+    :       `--23
+
+
+Ahora es mucho mejor! La raíz se muestra iniciando la linea con `<`. Y cada
+linea que le sigue inicia con `:`. Pero también podríamos usar otro tipo.
+
+```Haskell
+putStrLn "\nString binary tree:"
+print $ treeFromList ["foo","bar","baz","gor","yog"]
+```
+
+    String binary tree:
+    < "foo"
+    : |--"bar"
+    : |  `--"baz"
+    : `--"gor"
+    :    `--"yog"
+
+Como podemos probar igualdad y ordenar arboles, podemos hacer arboles de
+arboles!
+
+```Haskell
+putStrLn "\nBinary tree of Char binary trees:"
+print ( treeFromList
+        (map treeFromList ["baz","zara","bar"]))
+```
+
+    Binary tree of Char binary trees:
+    < < 'b'
+    : : |--'a'
+    : : `--'z'
+    : |--< 'b'
+    : |  : |--'a'
+    : |  : `--'r'
+    : `--< 'z'
+    :    : `--'a'
+    :    :    `--'r'
+
+
+Por eso elegí poner un `:` en cada linea del árbol (excepto en la raíz).
+
+![](http://yannesposito.com/Scratch/img/blog/Haskell-the-Hard-Way/yo_dawg_tree.jpg)
+
+
+```Haskell
+putStrLn "\nTree of Binary trees of Char binary trees:"
+print $ (treeFromList . map (treeFromList . map treeFromList))
+            [ ["YO","DAWG"]
+            , ["I","HEARD"]
+            , ["I","HEARD"]
+            , ["YOU","LIKE","TREES"] ]
+```
+
+Que es equivalente a
+
+```Haskell
+print ( treeFromList (
+          map treeFromList
+             [ map treeFromList ["YO","DAWG"]
+             , map treeFromList ["I","HEARD"]
+             , map treeFromList ["I","HEARD"]
+             , map treeFromList ["YOU","LIKE","TREES"] ]))
+```
+
+Y produce:
+
+    Binary tree of Binary trees of Char binary trees:
+    < < < 'Y'
+    : : : `--'O'
+    : : `--< 'D'
+    : :    : |--'A'
+    : :    : `--'W'
+    : :    :    `--'G'
+    : |--< < 'I'
+    : |  : `--< 'H'
+    : |  :    : |--'E'
+    : |  :    : |  `--'A'
+    : |  :    : |     `--'D'
+    : |  :    : `--'R'
+    : `--< < 'Y'
+    :    : : `--'O'
+    :    : :    `--'U'
+    :    : `--< 'L'
+    :    :    : `--'I'
+    :    :    :    |--'E'
+    :    :    :    `--'K'
+    :    :    `--< 'T'
+    :    :       : `--'R'
+    :    :       :    |--'E'
+    :    :       :    `--'S'
+
+
+Nota como arboles duplicados no son insertados; solo hay un árbol
+correspondiente a `"I", "HEARD"`. Podemos tener esto (casi)
+gratuitamente, por que hemos declarado que el tipo árbol es una instancia
+de `Eq`.
+
+Mira cuan genial es esta estructura: Podemos hacer arboles que contienen
+no solo enteros, cadenas y caracteres, sino también arboles. Y podemos
+incluso hacer un árbol que contenga arboles de arboles!
