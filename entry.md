@@ -1210,7 +1210,7 @@ int main() {
 ```
 
 C++ lo hace mucho mejor que C en este aspecto. Pero para funciones más
-complejas la sintaxis puede ser dificil de entender: Mira [este
+complejas la sintaxis puede ser difícil de entender: Mira [este
 artículo](http://bartoszmilewski.com/2009/10/21/what-does-haskell-have-to-do-with-c/)
 por ejemplo.
 
@@ -1775,3 +1775,21 @@ main = print $ treeTakeDepth 4 infTreeTwo
     :    `-- 2
     :       |-- 1
     :       `-- 3
+
+
+# Parte infernalmente difícil
+
+Felicitaciones por llegar tan lejos! Ahora, algunas de las cosas realmente
+difíciles pueden empezar.
+
+Si eres como yo, ya deberías comprender el estilo funcional. También deberías
+entender un poco más de las ventajas de la *pereza* (Laziness) por
+defecto. Pero también deberías NO comprender aún como empezar a escribir un
+programa real. Y en particular:
+
+* ¿Cómo se lidia con los efectos?
+* ¿Por qué hay una notación extraña parecida a la imperativa para lidiar con
+    IO?
+
+Prepárate, las respuestas pueden ser complejas. Pero son realmente
+gratificantes.
