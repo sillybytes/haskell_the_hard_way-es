@@ -1622,3 +1622,156 @@ de `Eq`.
 Mira cuan genial es esta estructura: Podemos hacer arboles que contienen
 no solo enteros, cadenas y caracteres, sino también arboles. Y podemos
 incluso hacer un árbol que contenga arboles de arboles!
+
+
+## Estructuras infinitas
+
+![](http://yannesposito.com/Scratch/img/blog/Haskell-the-Hard-Way/escher_infinite_lizards.jpg)
+
+Es común escuchar que Haskell es perezoso.
+
+De hecho, si se es un poco pedante, se debería decir que [Haskell es
+no-estricto.](http://www.haskell.org/haskellwiki/Lazy_vs._non-strict). Pereza es
+solo una implementación común de lenguajes no-estrictos.
+
+¿Pero qué significa "no-estricto"? Desde la wiki de Haskell:
+
+    Reduction (the mathematical term for evaluation) proceeds from the outside in.
+
+    so if you have (a+(b*c)) then you first reduce + first, then you reduce the inner (b*c)
+
+
+Por ejemplo en Haskell se puede hacer:
+
+```Haskell
+-- numbers = [1,2,..]
+numbers :: [Integer]
+numbers = 0:map (1+) numbers
+
+take' n [] = []
+take' 0 l = []
+take' n (x:xs) = x:take' (n-1) xs
+
+main = print $ take' 10 numbers
+```
+
+Y se detiene.
+
+¿Cómo?
+
+En lugar de intentar evaluar `numbers` por completo, evalúa los elementos solo
+cunado se los necesita.
+
+También, nótese que en Haskell hay una notación para listas infinitas.
+
+```Haskell
+[1..]   ⇔ [1,2,3,4...]
+[1,3..] ⇔ [1,3,5,7,9,11...]
+```
+
+Y la mayoría de las funciones funcionarán con ellas. También, hay una función
+`take` que es equivalente a nuestro `take'`
+
+Supón que queremos un árbol ordenado binario. Aquí hay una árbol binario
+infinito.
+
+```Haskell
+nullTree = Node 0 nullTree nullTree
+```
+
+Un árbol binario completo donde cada nodo es iguala a 0. Ahora probaré que
+se puede manipular este objeto usando la siguiente función:
+
+```Haskell
+-- take all element of a BinTree
+-- up to some depth
+treeTakeDepth _ Empty = Empty
+treeTakeDepth 0 _     = Empty
+treeTakeDepth n (Node x left right) = let
+          nl = treeTakeDepth (n-1) left
+          nr = treeTakeDepth (n-1) right
+          in
+              Node x nl nr
+```
+
+Mira lo que ocurre con este programa:
+
+```Haskell
+main = print $ treeTakeDepth 4 nullTree
+```
+
+Este código compila, se ejecuta y se detiene dando el siguiente
+resultado:
+
+    <  0
+    : |-- 0
+    : |  |-- 0
+    : |  |  |-- 0
+    : |  |  `-- 0
+    : |  `-- 0
+    : |     |-- 0
+    : |     `-- 0
+    : `-- 0
+    :    |-- 0
+    :    |  |-- 0
+    :    |  `-- 0
+    :    `-- 0
+    :       |-- 0
+    :       `-- 0
+
+
+Solo para calentar tus neuronas, hagamos un árbol más interesante:
+
+```Haskell
+iTree = Node 0 (dec iTree) (inc iTree)
+        where
+           dec (Node x l r) = Node (x-1) (dec l) (dec r)
+           inc (Node x l r) = Node (x+1) (inc l) (inc r)
+```
+
+Otra forma de crear ese árbol es usar una función de orden superior. Esta
+función debería ser similar a `map`, pero debería funcionar en `BinTree` en
+lugar de una lista.
+Aquí está la función:
+
+```Haskell
+-- apply a function to each node of Tree
+treeMap :: (a -> b) -> BinTree a -> BinTree b
+treeMap f Empty = Empty
+treeMap f (Node x left right) = Node (f x)
+                                     (treeMap f left)
+                                     (treeMap f right)
+```
+
+Nota: No hablaré más de esto aquí. Si estas interesado en la generalización de
+`map` a otras estructuras de datos, busca *functor* y `fmap`.
+
+Nuestra definición es ahora:
+
+```Haskell
+infTreeTwo :: BinTree Int
+infTreeTwo = Node 0 (treeMap (\x -> x-1) infTreeTwo)
+                    (treeMap (\x -> x+1) infTreeTwo)
+```
+
+Observa el resultado de
+
+```Haskell
+main = print $ treeTakeDepth 4 infTreeTwo
+```
+
+    <  0
+    : |-- -1
+    : |  |-- -2
+    : |  |  |-- -3
+    : |  |  `-- -1
+    : |  `-- 0
+    : |     |-- -1
+    : |     `-- 1
+    : `-- 1
+    :    |-- 0
+    :    |  |-- -1
+    :    |  `-- 1
+    :    `-- 2
+    :       |-- 1
+    :       `-- 3
