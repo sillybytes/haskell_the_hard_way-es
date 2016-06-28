@@ -1789,7 +1789,259 @@ programa real. Y en particular:
 
 * ¿Cómo se lidia con los efectos?
 * ¿Por qué hay una notación extraña parecida a la imperativa para lidiar con
-    IO?
+    Entrada/Salida (IO)?
 
 Prepárate, las respuestas pueden ser complejas. Pero son realmente
 gratificantes.
+
+
+## Lidiando con IO (Entrada/Salida)
+
+![](http://yannesposito.com/Scratch/img/blog/Haskell-the-Hard-Way/magritte_carte_blanche.jpg)
+
+
+*TL;DR*:
+
+Una función típica haciendo IO es muy parecida a un programa imperativo:
+
+```Haskell
+f :: IO a
+f = do
+  x <- action1
+  action2 x
+  y <- action3
+  action4 x y
+```
+
+* Para asignar un valor a un objeto se usa `<-`.
+* El tipo de cada linea es `IO *`; en este ejemplo:
+* `action1 :: IO b`
+* `action2 x :: IO ()`
+* `action3 :: IO c`
+* `action4 x y :: IO a`
+* `x :: b`, `y :: c`
+* Algunos objetos tienen el tipo `IO a`, esto debería ayudar a elegir. En
+  particular no se deberían usar funciones puras aquí. Para usar funciones
+  se puede hacer `action2 (purefunction x)` por ejemplo.
+
+En esta sección,, explicaré como usar IO, no como funciona. Se verá como
+Haskell separa la partes puras del programa de las impuras.
+
+No te detengas por que intentas comprender los detalles de la sintaxis. Las
+respuestas vendrán en la siguiente sección.
+
+Qué queremos lograr?
+
+    Pedir al usuario que ingrese una lista de números. Imprimir la suma de los
+    números.
+
+```Haskell
+toList :: String -> [Integer]
+toList input = read ("[" ++ input ++ "]")
+
+main = do
+  putStrLn "Enter a list of numbers (separated by comma):"
+  input <- getLine
+  print $ sum (toList input)
+```
+
+Debería ser sencillo comprender el comportamiento de este programa.
+Analicemos los tipos en más detalle.
+
+```Haskell
+putStrLn :: String -> IO ()
+getLine  :: IO String
+print    :: Show a => a -> IO ()
+```
+
+O más interesante, notamos que cada expresión en el bloque `do` tiene
+el tipo `IO a`
+
+```Haskell
+main = do
+  putStrLn "Enter ... " :: IO ()
+  getLine               :: IO String
+  print Something       :: IO ()
+```
+
+También debemos prestar atención a los efectos del símbolo `<-`.
+
+```Haskell
+do
+    x <- something
+```
+
+Si `something :: IO a` entonces `x :: a`.
+
+Otra cosa importante a notar sobre usar `IO`: Todas las lineas en un
+bloque `do` deben ser de una de dos posibles formas:
+
+```Haskell
+action1             :: IO a
+                    -- in this case, generally a = ()
+```
+
+O
+
+```Haskell
+value <- action2    -- where
+                    -- action2 :: IO b
+                    -- value   :: b
+```
+
+Estos dos tipos de linea corresponderán a dos formas diferentes de
+secuenciar acciones. El significado de esta sentencia debería quedar clara para
+el final de la siguiente sección.
+
+Ahora veamos como se comporta el programa. Por ejemplo, qué ocurre si el
+usuario ingresa algo extraño? Intentemos:
+
+    % runghc 02_progressive_io_example.lhs
+        Enter a list of numbers (separated by comma):
+        foo
+        Prelude.read: no parse
+
+
+Un horrible mensaje de error y un fallo! Nuestra primera mejora será
+responder con un mensaje más amigable.
+
+Para hacerlo, debemos detectar que algo salió mal. Aquí hay una forma de
+hacerlo: usar el tipo `Maybe`. Este es un tipo muy común en Haskell.
+
+```Haskell
+import Data.Maybe
+```
+
+¿Qué es esto? `Maybe` es un tipo que toma un parámetro. Su definición es:
+
+```Haskell
+data Maybe a = Nothing | Just a
+```
+
+Esta es una forma muy agradable de decir que hubo un error mientras se
+intentaba crear/computar un valor. La función `maybeRead` es un gran ejemplo de
+esto. Esta es una función similar a la función `read`^4, pero si algo sale mal
+el valor retornado es `Nothing`. Si el valor es correcto, retorna `Just <el
+valor>`. No intentes comprender mucho de esta función. Se usa una función de
+nivel menor a `read`; `reads`.
+
+```Haskell
+maybeRead :: Read a => String -> Maybe a
+maybeRead s = case reads s of
+                  [(x,"")]    -> Just x
+                  _           -> Nothing
+
+```
+
+Ahora para estar un poco más seguros, definimos una función que va así: Si la
+cadena tiene el formato incorrecto, se retorna `Nothing`. Caso contrario, por
+ejemplo "1,2,3", se retorna `Just [1,2,3]`.
+
+```Haskell
+getListFromString :: String -> Maybe [Integer]
+getListFromString str = maybeRead $ "[" ++ str ++ "]"
+```
+
+Simplemente tenemos que probar el valor en nuestra función principal `main`.
+
+```Haskell
+main :: IO ()
+main = do
+  putStrLn "Enter a list of numbers (separated by comma):"
+  input <- getLine
+  let maybeList = getListFromString input in
+      case maybeList of
+          Just l  -> print (sum l)
+          Nothing -> error "Bad format. Good Bye."
+```
+
+En caso de error, mostramos un mensaje de error amigable.
+
+
+Nótese que el tipo de cada expresión en el bloque `do` de main permanece en
+la forma `IO a`. La única construcción extraña es `error`. Aquí solo diré que
+`error msg` toma el tipo necesario (aquí `IO ()`).
+
+Una cosa importante  es el tipo de todas las funciones definidas hasta ahora.
+Solo hay una función que contiene `IO` en su tipo: `main`. Esto significa que
+main es impura. Pero main usa `getListFromString` que es pura. Entonces
+queda claro solo observando los tipos declarados que funciones son
+puras y cuales son impuras.
+
+¿Por qué importa la pureza? Entre las muchas ventajas, aquí hay tres:
+
+* Es más fácil pensar sobre una pieza de código puro que código impuro
+* La pureza te protege de los errores difícil de reproducir debido a los efectos
+    secundarios.
+* Se pueden evaluar funciones puras en cualquier orden o en paralelo sin riesgo.
+
+Por esto se debe poner todo el código posible dentro de funciones puras.
+
+Nuestra siguiente iteración será pedir al usuario una y otra vez hasta que
+introduzca una respuesta valida.
+
+
+Mantenemos la primera parte:
+
+```Haskell
+import Data.Maybe
+
+maybeRead :: Read a => String -> Maybe a
+maybeRead s = case reads s of
+                  [(x,"")]    -> Just x
+                  _           -> Nothing
+getListFromString :: String -> Maybe [Integer]
+getListFromString str = maybeRead $ "[" ++ str ++ "]"
+```
+
+
+Ahora creamos una función que pregunte al usuario la lista de enteros
+hasta que la entrada sea correcta.
+
+```Haskell
+askUser :: IO [Integer]
+askUser = do
+  putStrLn "Enter a list of numbers (separated by comma):"
+  input <- getLine
+  let maybeList = getListFromString input in
+      case maybeList of
+          Just l  -> return l
+          Nothing -> askUser
+```
+
+Esta función es de tipo `IO [Integer]`. Este tipo significa que obtendremos
+un valor de tipo `[Integer]` a travez de acciones de entrada/salida (IO).
+Algunas personas podrían explicar mientras sacuden las manos:
+
+> Esto es un `[Integer]` dentro de un `IO`
+
+Si quieres comprender los detalles detrás de todo esto, tendrás que leer la
+siguiente sección. Pero en realidad, si solamente quieres saber como *usar*
+IO solo practica un poco y recuerda pensar sobre el tipo.
+
+Finalmente la función main es mucho más simple:
+
+```Haskell
+main :: IO ()
+main = do
+  list <- askUser
+  print $ sum list
+```
+
+Hemos terminado con la introducción a la entrada/salida `IO`. Fue rápido.
+Estas son las principales cosas que hay que recordar.
+
+* En el bloque `do`, cada expresión debe tener el tipo `IO a`. Así que estas
+    limitado en el numero de expresiones disponibles. Por ejemplo, `getLine`,
+    `print`, `putStrLn`, etc...
+* Intenta independizar las funciones puras todo lo posible.
+* El tipo `IO a` significa: una **acción** IO que retorna un elemento de
+  tipo `a`. `IO` representa *acciones*; por dentro, `IO a` es el tipo de
+  una función. Lee la siguiente sección si te da curiosidad.
+
+
+  Si practicas un poco, deberías ser capaz de usar `IO`.
+
+    Ejercicios:
+        * Hacer un programa que sume todos sus argumentos.
+        Pista: Usa la función `getArgs`.
