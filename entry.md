@@ -1920,7 +1920,7 @@ data Maybe a = Nothing | Just a
 
 Esta es una forma muy agradable de decir que hubo un error mientras se
 intentaba crear/computar un valor. La función `maybeRead` es un gran ejemplo de
-esto. Esta es una función similar a la función `read`^4, pero si algo sale mal
+esto. Esta es una función similar a la función `read`[^4], pero si algo sale mal
 el valor retornado es `Nothing`. Si el valor es correcto, retorna `Just <el
 valor>`. No intentes comprender mucho de esta función. Se usa una función de
 nivel menor a `read`; `reads`.
@@ -2139,10 +2139,10 @@ main :: World -> World
 
 No todas las funciones pueden tener acceso a esta variable. Aquellas que tienen
 acceso son impuras. Funciones a las que no se les provee esta variable
-del mundo son puras^5.
+del mundo son puras[^5].
 
 Haskell considera el estado del mundo exterior como una variable de enterada a
-`main`. Pero el tipo real de main es más parecido a^6:
+`main`. Pero el tipo real de main es más parecido a[^6]:
 
 ```Haskell
 main :: World -> ((),World)
@@ -2739,7 +2739,7 @@ los monads son muy útiles para:
 * Escribir estado
 * ...
 
-Si me has seguido hasta aquí, entonces lo lograste! Sabes Monads^7!
+Si me has seguido hasta aquí, entonces lo lograste! Sabes Monads[^7]!
 
 
 # Apéndice
@@ -2957,3 +2957,28 @@ treeFromList' (x:xs) n = Node x left right
         right = treeFromList' (safefilter' (>x) xs (f n)
         f = ???
 ```
+
+
+
+[^1]. Incluso si los lenguajes mas recientes intentan ocultarlos, están
+presentes.
+
+[^2]. Se que estoy haciendo trampa. Pero hablaré "no estricto" luego.
+
+[^3]. Para los valientes, una explicación más completa del patrón de matching se
+puede encontrar
+[aquí](http://www.cs.auckland.ac.nz/references/haskell/haskell-intro-html/patterns.html).
+
+[^4]. Es muy similar al `eval` de javascript en una cadena que contiene
+JSON.
+
+[^5]. Hay algunas excepciones *no seguras* ha esta regla. Pero no deberías
+ver su uso en una aplicación real excepto tal vez para propósitos de depuración.
+
+[^6]. Para los curiosos el tipo real es `data IO a = IO {unIO :: State#
+RealWorld -> (#State# RealWorld, a #)}`. Los '#' tienen que ver con la
+optimización.
+
+[^7]. Ciertamente necesitas practicar un poco para acostumbrarte a ellos y
+entender cuando los puedes usar y crearlos tu mismo. Pero ya haz hecho un
+gran avance.
