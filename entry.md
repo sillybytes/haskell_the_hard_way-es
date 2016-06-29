@@ -2689,3 +2689,271 @@ instance Monad Maybe where
 
 El monad `Maybe` probó ser útil en este ejemplo. Vimos la utilidad de el monad
 `IO`. Pero vamos por un mejor ejemplo, las listas.
+
+
+### El monad lista
+
+![](http://yannesposito.com/Scratch/img/blog/Haskell-the-Hard-Way/golconde.jpg)
+
+El monad lista ayuda a simular cómputos no determinístico:
+
+```Haskell
+import Control.Monad (guard)
+
+allCases = [1..10]
+
+resolve :: [(Int,Int,Int)]
+resolve = do
+              x <- allCases
+              y <- allCases
+              z <- allCases
+              guard $ 4*x + 2*y < z
+              return (x,y,z)
+
+main = do
+  print resolve
+```
+
+MAGIA:
+
+    [(1,1,7),(1,1,8),(1,1,9),(1,1,10),(1,2,9),(1,2,10)]
+
+
+Para el monad lista, también hay azúcar sintáctica:
+
+```Haskell
+print $ [ (x,y,z) | x <- allCases,
+                      y <- allCases,
+                      z <- allCases,
+                      4*x + 2*y < z ]
+```
+
+No listaré todos los monads, pero hay muchos de ellos. Usar monads simplifica
+la manipulación de varias nociones en lenguajes puros. En particular,
+los monads son muy útiles para:
+
+* IO
+* Computo no determinístico
+* Generar números pseudo aleatorios
+* Mantener configuración de estado
+* Escribir estado
+* ...
+
+Si me has seguido hasta aquí, entonces lo lograste! Sabes Monads^7!
+
+
+# Apéndice
+
+Esta sección no se trata de aprender Haskell. Solo está aquí para discutir a
+más profundidad algunos detalles.
+
+
+## Más sobre los arboles infinitos
+
+En la sección *Estructuras infinitas* vimos algunas construcciones simples.
+Desafortunadamente removimos dos propiedades de nuestro árbol:
+
+1. No valores duplicados en los nodos
+2. Árbol bien ordenado
+
+En esta sección intentaremos mantener la primera propiedad.
+Respecto a la segunda, debemos relajarla pero discutiremos como mantenerla
+todo lo posible.
+
+El primer paso es crear una lista de números pseudo aleatorios:
+
+```Haskell
+shuffle = map (\x -> (x*3123) `mod` 4331) [1..]
+```
+
+Solo como recordatorio, aquí esta la definición de `treeFromList`
+
+```Haskell
+treeFromList :: (Ord a) => [a] -> BinTree a
+treeFromList []    = Empty
+treeFromList (x:xs) = Node x (treeFromList (filter (<x) xs))
+                             (treeFromList (filter (>x) xs))
+```
+
+y `treeTakeDepth`:
+
+```Haskell
+treeTakeDepth _ Empty = Empty
+treeTakeDepth 0 _     = Empty
+treeTakeDepth n (Node x left right) = let
+          nl = treeTakeDepth (n-1) left
+          nr = treeTakeDepth (n-1) right
+          in
+              Node x nl nr
+```
+
+Observa el resultado de:
+
+```Haskell
+main = do
+      putStrLn "take 10 shuffle"
+      print $ take 10 shuffle
+      putStrLn "\ntreeTakeDepth 4 (treeFromList shuffle)"
+      print $ treeTakeDepth 4 (treeFromList shuffle)
+```
+
+    % runghc 02_Hard_Part/41_Infinites_Structures.lhs
+    take 10 shuffle
+    [3123,1915,707,3830,2622,1414,206,3329,2121,913]
+    treeTakeDepth 4 (treeFromList shuffle)
+
+    < 3123
+    : |--1915
+    : |  |--707
+    : |  |  |--206
+    : |  |  `--1414
+    : |  `--2622
+    : |     |--2121
+    : |     `--2828
+    : `--3830
+    :    |--3329
+    :    |  |--3240
+    :    |  `--3535
+    :    `--4036
+    :       |--3947
+    :       `--4242
+
+
+Bien! Termina! Pero cuidado, solo funcionará si tiene algo que poner en la rama.
+
+Por ejemplo
+
+```Haskell
+treeTakeDepth 4 (treeFromList [1..])
+```
+
+No terminará nunca. Por que intentará acceder a la cabeza de `filter (<1)
+[2..]`. Pero `filger` no es lo bastante inteligente para entender que el
+resultado es una lista vacía.
+
+Aun así, es un ejemplo muy bueno de lo que los programas no estrictos
+pueden ofrecer.
+
+Como ejercicio para el lector:
+
+* Probar la existencia de un numero `n` tal que `treeTakeDepth n
+  (treeFromList shuffle)` entrará en un loop infinito.
+* Encontrar un limite superior para `n`.
+* Probar que no hay una lista `suffle` tal que para cualquier
+  profundidad, el programa termina.
+
+
+Para resolver este problema modificaremos un poco las funciones
+`treeFromList` y `shuffle`.
+
+Un primer problema es la falta de infinitos números diferentes en nuestra
+implementación de `shuffle`. Solo hemos generado `4331` números distintos.
+Para solucionarlo haremos una función `shuffle` mejorada.
+
+```Haskell
+shuffle = map rand [1..]
+          where
+              rand x = ((p x) `mod` (x+c)) - ((x+c) `div` 2)
+              p x = m*x^2 + n*x + o -- some polynome
+              m = 3123
+              n = 31
+              o = 7641
+              c = 1237
+```
+
+Esta función tiene la propiedad de no tener un limite superior o inferior.
+Pero tener una lista mejor mezclada no es suficiente para no entrar en un
+bucle infinito.
+
+Generalmente, no podemos decidir si `filter (<x) xs` está vacía. Entonces
+para resolver este problema, autorizaré algo de error en la creación del árbol
+binario. Esta nueva versión puede crear un árbol binario que no tienen la
+siguiente propiedad para algunos de sus nodos:
+
+    Cualquier elemento en la rama izquierda debe ser estrictamente
+    inferior a la etiqueta de la raíz.
+
+
+Permanecerá en su *mayor parte* un árbol binario ordenado. Más aún, por
+construcción, el valor de cada nodo es único en el árbol.
+
+Aquí nuestra nueva versión de `treeFromList`. Simplemente sea ha remplazado
+`filter` por `safefilter`.
+
+```Haskell
+treeFromList :: (Ord a, Show a) => [a] -> BinTree a
+treeFromList []    = Empty
+treeFromList (x:xs) = Node x left right
+          where
+              left = treeFromList $ safefilter (<x) xs
+              right = treeFromList $ safefilter (>x) xs
+```
+
+Esta nueva función `safefilter` es casi equivalente a `filter` pero no entra en
+un bucle infinito si el resultado es una lista infinita. Si no puede encontrar
+un elemento para el cual la prueba resulte cierta luego de 10000 pasos
+consecutivos, entonces considera que es el final de la búsqueda.
+
+```Haskell
+safefilter :: (a -> Bool) -> [a] -> [a]
+safefilter f l = safefilter' f l nbTry
+  where
+      nbTry = 10000
+      safefilter' _ _ 0 = []
+      safefilter' _ [] _ = []
+      safefilter' f (x:xs) n =
+                  if f x
+                     then x : safefilter' f xs nbTry
+                     else safefilter' f xs (n-1)
+```
+
+Ahora el programa se ejecuta bien:
+
+```Haskell
+main = do
+      putStrLn "take 10 shuffle"
+      print $ take 10 shuffle
+      putStrLn "\ntreeTakeDepth 8 (treeFromList shuffle)"
+      print $ treeTakeDepth 8 (treeFromList $ shuffle)
+```
+
+Se debería ver que el tiempo para imprimir cada valor es diferente. Esto es por
+que Haskell calcula cada valor cuando lo necesita. Y en este caso, esto ocurre
+cuando se solicita imprimirlo en pantalla.
+
+Intenta remplazar la profundidad de `8` a `100`. Funcionará sin comerse tu
+RAM! El flujo en el manejo de memoria es hecho de forma natural por Haskell.
+
+
+Como ejercicio para el lector:
+
+* Incluso con un valor grande constante para `deep` y `nbTry`, parece funcionar
+  bien. Pero en el peor caso, puede ser exponencial. Crear una lista para el
+  peor caso y darlo como parámetro a `treeFromList`. Pista: piensa en
+  `[0,-1,-1,...,-1,1,-1,...,-1,1,...]`.
+
+* Primero intenté implementar `safefilter` como:
+
+```Haskell
+safefilter' f l = if filter f (take 10000 l) == []
+            then []
+            else filter f l
+```
+
+Explica por que no funciona y puede entrar en un loop infinito.
+
+* Supón que `shuffle` es una lista aleatoria real con limites crecientes.
+  Si estudias un poco esta estructura, descubrirás que con una
+  probabilidad de 1, esta es una estructura infinita. Usando el siguiente
+  código encuentra una definición de `f` tal que con probabilidad de `1`,
+  `treeFromList' shuffle` es infinita. Y pruebalo. (esto solo es una
+  conjetura).
+
+```Haskell
+treeFromList' []  n = Empty
+treeFromList' (x:xs) n = Node x left right
+    where
+        left = treeFromList' (safefilter' (<x) xs (f n)
+        right = treeFromList' (safefilter' (>x) xs (f n)
+        f = ???
+```
