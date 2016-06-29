@@ -389,7 +389,7 @@ Finalmente, `Num a => a -> a -> a` significa:
 Sea `a` un tipo que pertenece a la clase de tipo `Num`. Esto es una función de
 tipo `a` a (`a -> a`).
 
-Si, extraño. De echo, en Haskell ninguna función tiene dos argumentos.
+Si, extraño. De hecho, en Haskell ninguna función tiene dos argumentos.
 En lugar de eso todas las funciones pueden tener un solo argumento. Pero
 notaremos que tomar dos argumentos es equivalente a tomar un argumento
 y retornar una función que toma el segundo argumento como parámetro.
@@ -793,7 +793,7 @@ Aquí un ejemplo de la ejecución[^2]:
     6
 
 
-Viniendo de un lenguaje imperativo todo debería parecer correcto. De echo,
+Viniendo de un lenguaje imperativo todo debería parecer correcto. De hecho,
 muchas cosas se pueden mejorar. Primero, podemos generalizar el tipo.
 
 ```Haskell
@@ -1098,7 +1098,7 @@ Uno de los mayores poderes de Haskell es la habilidad de crear DSLs (Lenguaje
 de dominio específico) haciendo sencillo cambiar el paradigma de
 programación.
 
-De echo, Haskell también es grandioso cuando se quiere escribir en estilo
+De hecho, Haskell también es grandioso cuando se quiere escribir en estilo
 imperativo. Comprender esto fue muy difícil para mi cuando aprendía Haskell.
 Gran parte del esfuerzo se va intentando explicar la superioridad del enfoque
 funcional. Luego cuando empiezas a usar estilo imperativo con Haskell,
@@ -1249,7 +1249,7 @@ Pero esto no te protege mucho. Intenta intercambiar los dos parámetros de
     putStrLn $ showInfos color name
 
 
-Se compilará y ejecutará. De echo se pueden reemplazar `Name`, `Color` y
+Se compilará y ejecutará. De hecho se pueden reemplazar `Name`, `Color` y
 `String` con cualquier cosa. El compilador los tratará como si fueran
 idénticos.
 
@@ -2045,3 +2045,468 @@ Estas son las principales cosas que hay que recordar.
     Ejercicios:
         * Hacer un programa que sume todos sus argumentos.
         Pista: Usa la función `getArgs`.
+
+
+## El truco de la entrada/salida (IO) explicado
+
+![](http://yannesposito.com/Scratch/img/blog/Haskell-the-Hard-Way/magritte_pipe.jpg)
+
+
+TL;DR\*:
+
+Para separar las partes puras de las impuras, `main` es la función que
+modifica el estado del mundo exterior
+
+```Haskell
+main :: World -> World
+```
+
+Una función garantiza que solo tendrá efectos secundarios si tiene este tipo.
+Pero observa una función `main` típica:
+
+```Haskell
+main w0 =
+    let (v1,w1) = action1 w0 in
+    let (v2,w2) = action2 v1 w1 in
+    let (v3,w3) = action3 v2 w2 in
+    action4 v3 w3
+```
+
+Tenemos varios elementos temporales (`w1`, `w2`, `w3`) que deben ser pasados a
+la siguiente sección.
+
+Creamos una función `bind` o `(>>=)`. Con `bind` ya no necesitamos nombres
+temporales.
+
+```Haskell
+main =
+  action1 >>= action2 >>= action3 >>= action4
+```
+
+Bonus: Haskell tiene azúcar sintáctica para nosotros:
+
+```Haskell
+main = do
+  v1 <- action1
+  v2 <- action2 v1
+  v3 <- action3 v2
+  action4 v3
+```
+
+Por qué usamos esta sintaxis extraña, y qué es exactamente este tipo `IO`?
+Parece algo mágico.
+
+Por ahora vamos a olvidarnos sobre las partes puras de nuestro programa,
+y enfocarnos en las partes impuras.
+
+```Haskell
+askUser :: IO [Integer]
+askUser = do
+  putStrLn "Enter a list of numbers (separated by commas):"
+  input <- getLine
+  let maybeList = getListFromString input in
+      case maybeList of
+          Just l  -> return l
+          Nothing -> askUser
+
+main :: IO ()
+main = do
+  list <- askUser
+  print $ sum list
+```
+
+Primera cuestión remarcarle: esto parece un programa imperativo. Haskell es
+lo suficientemente poderoso para hacer código impuro lucir imperativo.
+Por ejemplo, si deseas podrías crear un `while` en Haskell. De hecho, para
+lidiar con entrada/salida, un estilo imperativo es generalmente más apropiado.
+
+Pero deberías haber notado que esta notación es un poco inusual. Aquí el por
+qué, en detalle.
+
+En un lenguaje imperativo el estado del mundo puede ser visto como una gran
+variable global oculta. Esta variable oculta es accesible por todas las
+funciones del lenguaje. Por ejemplo, se pude leer desde un fichero en
+cualquier función. Sea que el fichero exista o no es una diferencia en el
+posible estado que el mundo puede tomar.
+
+En Haskell este estado no es oculto. Más bien, se dice
+*explicitamemten* que `main` es una función que puede *potencialmente*
+cambiar el estado del mundo. Su tipo es como:
+
+```Haskell
+main :: World -> World
+```
+
+No todas las funciones pueden tener acceso a esta variable. Aquellas que tienen
+acceso son impuras. Funciones a las que no se les provee esta variable
+del mundo son puras^5.
+
+Haskell considera el estado del mundo exterior como una variable de enterada a
+`main`. Pero el tipo real de main es más parecido a^6:
+
+```Haskell
+main :: World -> ((),World)
+```
+
+El tipo `()` es el tipo unitario. Nada que ver aquí.
+
+Ahora escribamos nuestra función principal con esto en mente:
+
+```Haskell
+main w0 =
+    let (list,w1) = askUser w0 in
+    let (x,w2) = print (sum list,w1) in
+    x
+```
+
+Primero, notamos que todas las funciones que tienen efectos secundarios
+deben tener el tipo:
+
+```Haskell
+World -> (a,World)
+```
+
+Donde `a` es el tipo del resultado. Por ejemplo, una función `getChar`
+debería tener el tipo `World -> (Char, World)`.
+
+Otra cosa a notar es el truco para fijar el orden de la evaluación. En
+Haskell, para evaluar `f a b`, tienes varias opciones:
+
+* primero evaluar `a` luego `b` luego `f a b`
+* primero evaluar `b` luego `a` luego `f a b`
+* evaluar `a` y `b` en paralelo y luego `f a b`
+
+Esto es verdad por que estamos trabajando en la parte pura del lenguaje.
+
+Ahora, si tomas la función `main`, está claro que debes evaluar la primera
+linea antes de la segunda puesto que para evaluar la segunda linea es
+necesario obtener el parámetro dado en la evaluación de la primera linea.
+
+Este truco funciona bien. El compilador proveerá en cada paso un puntero a
+un nuevo identificador del mundo real. Por dentro, `print` se evaluará
+como:
+
+* imprimir algo en la pantalla
+* modifica el *id* del mundo exterior
+* evaluar como `((),new world id)`.
+
+Ahora, si miras el estilo de la función main, es claramente incómodo. Intentemos
+hacer lo mismo a la función askUser:
+
+```Haskell
+askUser :: World -> ([Integer],World)
+```
+
+Antes:
+
+```Haskell
+askUser :: IO [Integer]
+askUser = do
+  putStrLn "Enter a list of numbers:"
+  input <- getLine
+  let maybeList = getListFromString input in
+      case maybeList of
+          Just l  -> return l
+          Nothing -> askUser
+```
+
+Después:
+
+```Haskell
+askUser w0 =
+    let (_,w1)     = putStrLn "Enter a list of numbers:" in
+    let (input,w2) = getLine w1 in
+    let (l,w3)     = case getListFromString input of
+                      Just l   -> (l,w2)
+                      Nothing  -> askUser w2
+    in
+        (l,w3)
+```
+
+Esto es similar, pero incómodo. Mira todos esos nombres temporales `w?`.
+
+La lección es: poner implementación `IO` en lenguajes funcionales puros es
+incómodo!
+
+Afortunamdamente, hay una mejor forma de manejar este problema. Observamos
+un patrón. Cada linea es de la forma:
+
+```Haskell
+let (y, w') = action x w in
+```
+
+Incluso si para alguna linea el primer argumento `x` no es necesario.
+La salida es de tipo tupla, `(answer, newWorldValue)`. Cada función `f` debe
+tener un tipo similar a:
+
+```Haskell
+f :: World -> (a,World)
+```
+
+No solo eso, también podemos notar que siempre seguimos el mismo patrón de
+uso:
+
+```Haskell
+let (y,w1) = action1 w0 in
+let (z,w2) = action2 w1 in
+let (t,w3) = action3 w2 in
+...
+```
+
+Cada acción puede tomar de 0 a n parámetros. Y en particular, cada acción
+puede tomar un parámetro del resultado de la linea anterior.
+
+Por ejemplo, también podríamos tener:
+
+```Haskell
+let (_,w1) = action1 x w0   in
+let (z,w2) = action2 w1     in
+let (_,w3) = action3 x z w2 in
+...
+```
+
+Y por supuesto `actionN w :: (World) -> (a,World)`.
+
+IMPORTANTE: Hay dos patrones importantes a considerar:
+
+```Haskell
+let (x,w1) = action1 w0 in
+let (y,w2) = action2 x w1 in
+```
+
+Y
+
+```Haskell
+let (_,w1) = action1 w0 in
+let (y,w2) = action2 w1 in
+```
+
+![](http://yannesposito.com/Scratch/img/blog/Haskell-the-Hard-Way/jocker_pencil_trick.jpg)
+
+Ahora, haremos un truco de magia. Haremos que el símbolo del mundo temporal
+"desaparezca". Haremos un `bind` a las dos lineas. Dinamos la función
+`bind`. Su tipo es un poco intimidarte al principio:
+
+```Haskell
+bind :: (World -> (a,World))
+        -> (a -> (World -> (b,World)))
+        -> (World -> (b,World))
+```
+
+Pero recuerda que `(World -> (a,World))` es un tipo para una acción `IO`. Ahora
+renombremoslo por claridad:
+
+```Haskell
+type IO a = World -> (a, World)
+```
+
+Algunos ejemplos de funciones:
+
+```Haskell
+getLine :: IO String
+print :: Show a => a -> IO ()
+```
+
+`getLine` es una acción `IO` que toma el mundo exterior como parámetro
+y retorna una tupla `(String,World)`. Esto se puede resumir como: `getLine`
+es de tipo `IO String`, que también vemos como una acción IO que retornará
+una cadena "embeded inside an IO".
+
+La función `print` también es interesante. Toma un argumento que puede ser
+mostrado. De hecho puede tomar dos argumentos. El primero es el valor a
+imprimir y el otro es el estado del mundo exterior. Luego retorna una tupla
+de tipo `((),World)`. Esto significa que cambia el estado del mundo exterior,
+pero no produce más información.
+
+Este tipo nos ayuda a simplificar el tipo de `bind`:
+
+```Haskell
+bind :: IO a
+        -> (a -> IO b)
+        -> IO b
+```
+
+Dice que  `bind` toma dos acciones IO como parámetros y retorna otra acción IO.
+
+Ahora, recuerda los patrones *importantes*. El primero era:
+
+```Haskell
+let (x,w1) = action1 w0 in
+let (y,w2) = action2 x w1 in
+(y,w2)
+```
+
+Observa los tipos:
+
+```Haskell
+action1  :: IO a
+action2  :: a -> IO b
+(y,w2)   :: IO b
+```
+
+Resulta familiar?
+
+```Haskell
+(bind action1 action2) w0 =
+    let (x, w1) = action1 w0
+        (y, w2) = action2 x w1
+    in  (y, w2)
+```
+
+La idea es esconder el argumento del mundo exterior con esta función.
+Hagamoslo: Como un ejemplo imagina que queremos simular:
+
+```Haskell
+let (line1,w1) = getLine w0 in
+let ((),w2) = print line1 in
+((),w2)
+```
+
+Ahora, usando la función bind:
+
+```Haskell
+(res,w2) = (bind getLine (\l -> print l)) w0
+```
+
+Como print es de tipo `(World -> ((),World))`, sabemos que `res = ()` (tipo
+nulo). Si no te diste cuenta de la magia aquí, intentemos con tres lineas esta
+vez:
+
+```Haskell
+let (line1,w1) = getLine w0 in
+let (line2,w2) = getLine w1 in
+let ((),w3) = print (line1 ++ line2) in
+((),w3)
+```
+
+Que es equivalente a:
+
+```Haskell
+(res,w3) = (bind getLine (\line1 ->
+             (bind getLine (\line2 ->
+               print (line1 ++ line2))))) w0
+```
+
+Notaste algo? Si, nada de variables temporales del mundo exterior en ninguna
+parte! Esto es MÁGICO.
+
+Podemos usar una mejor notación. Usemos `(>>=)` en lugar de `bind`. `(>>=)` es
+una función infijo como `(+)`; Recuerda `3 + 4 ⇔ (+) 3 4`
+
+```Haskell
+(res,w3) = (getLine >>=
+           (\line1 -> getLine >>=
+           (\line2 -> print (line1 ++ line2)))) w0
+```
+
+Haskell tiene azúcar sintáctica para nosotros:
+
+```Haskell
+do
+  x <- action1
+  y <- action2
+  z <- action3
+  ...
+```
+
+Se reemplaza con:
+
+```Haskell
+action1 >>= (\x ->
+action2 >>= (\y ->
+action3 >>= (\z ->
+...
+)))
+```
+
+Nota que se puede usar `x` en `action2` y `x` y `y` en `action3`.
+
+Pero qué pasa con las lineas que no usan `<-`?
+Fácil, otra función `blindBind`:
+
+```Haskell
+blindBind :: IO a -> IO b -> IO b
+blindBind action1 action2 w0 =
+    bind action (\_ -> action2) w0
+```
+
+No simplifiqué esta definición por propósitos de claridad. Pero claro que
+podemos usar una mejor notación, usaremos el operador `(>>)`.
+
+Y
+
+```Haskell
+do
+    action1
+    action2
+    action3
+```
+
+Se transforma en
+
+```Haskell
+action1 >>
+action2 >>
+action3
+```
+
+También, otra función útil.
+
+```Haskell
+putInIO :: a -> IO a
+putInIO x = IO (\w -> (x,w))
+```
+
+Esto es en general la forma de poner variables dentro de un "contexto
+de IO". El nombre general para `ponerEnIO` es `return`. Que es un mal nombre
+cuando aprendes Haskell. `return` es muy distinto de lo que puedes estar
+acostumbrado.
+
+
+Para finalizar, traduzcamos nuestro ejemplo:
+
+```Haskell
+askUser :: IO [Integer]
+askUser = do
+  putStrLn "Enter a list of numbers (separated by commas):"
+  input <- getLine
+  let maybeList = getListFromString input in
+      case maybeList of
+          Just l  -> return l
+          Nothing -> askUser
+
+main :: IO ()
+main = do
+  list <- askUser
+  print $ sum list
+```
+
+Se traduce a:
+
+```Haskell
+import Data.Maybe
+
+maybeRead :: Read a => String -> Maybe a
+maybeRead s = case reads s of
+                  [(x,"")]    -> Just x
+                  _           -> Nothing
+getListFromString :: String -> Maybe [Integer]
+getListFromString str = maybeRead $ "[" ++ str ++ "]"
+askUser :: IO [Integer]
+askUser =
+    putStrLn "Enter a list of numbers (sep. by commas):" >>
+    getLine >>= \input ->
+    let maybeList = getListFromString input in
+      case maybeList of
+        Just l -> return l
+        Nothing -> askUser
+```
+
+main :: IO ()
+main = askUser >>=
+  \list -> print $ sum list
+
+
+Puedes compilar este código y verificar que funciona.
+
+Imagina como se vería sin el `(>>)` y `(>>=)`.
