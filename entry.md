@@ -315,7 +315,7 @@ f x y = x*x + y*y
 main = print (f 2.3 4.2)
 ```
 
-Funciona! afortunadamente, no tenemos que declarar una nueva funcion para cada
+Funciona! Afortunadamente, no tenemos que declarar una nueva función para cada
 tipo. Por ejemplo, in `C`, deberíamos declarar una función para `int`,
 para `float` para `long`, para `double`, etc...
 
@@ -360,10 +360,10 @@ comprenderlo, solo mira una lista de ejemplos progresivos:
 | a -> a -> a | El tipo de función de dos argumentos de cualquier tipo a al
 mismo tipo a |
 
-En el tipo `a -> a -> a`, la letra `a` es una *variable de tipo*. Significa
-que `f` es una función con dos argumentos y esos dos argumentos y el resultado
-tienen que ser del mismo tipo, La variable de tipo `a` puede ser cualquier
-tipo. Por ejemplo `Int`, `Integer`, `Float`...
+En el tipo `a -> a -> a`, la letra `a` es una *variable de tipo*. Significa que
+`f` es una función con dos argumentos y esos dos argumentos y el resultado
+tienen que ser del mismo tipo, La variable de tipo `a` puede ser cualquier tipo.
+Por ejemplo `Int`, `Integer`, `Float`...
 
 Así que en lugar de forzar un tipo en particular como en `C` y tener que
 declarar una función para `int`, `long`, `float`, `double`, etc., podemos
@@ -931,7 +931,7 @@ La función `filter` toma una función de tipo (`a -> Bool`) y una lista de
 tipo `[a]`. Retorna una lista que contiene solamente los elementos para los
 cuales la función retornó `true`.
 
-El siguiente paso es usar otra tecnica para lograr el mismo resultado que un
+El siguiente paso es usar otra técnica para lograr el mismo resultado que un
 loop. Usaremos la función `foldl` para acumular los valores mientras recorremos
 la lista. La función `foldl` captura un patrón común:
 
@@ -947,7 +947,6 @@ Que se puede reemplazar con:
 myfunc list = foldl bar initialValue list
 ```
 
-If you really want to know how the magic works, here is the definition of foldl:
 Si realmente quieres saber como funciona la magia, aquí está la definición
 de `foldl`:
 
@@ -1048,7 +1047,6 @@ evenSum = sum' . (filter even)
 Es tiempo de hablar sobre la dirección hacia la cual se ha movido nuestro
 código mientras introducimos más de la forma funcional. Qué hemos ganado al
 usar funciones de orden superior?
-
 
 Al principio podrías pensar que la principal diferencia es la brevedad.
 Pero en realidad tiene más que ver con la forma en la que se piensa. Supongamos
@@ -2010,7 +2008,7 @@ askUser = do
 ```
 
 Esta función es de tipo `IO [Integer]`. Este tipo significa que obtendremos
-un valor de tipo `[Integer]` a travez de acciones de entrada/salida (IO).
+un valor de tipo `[Integer]` a través de acciones de entrada/salida (IO).
 Algunas personas podrían explicar mientras sacuden las manos:
 
 > Esto es un `[Integer]` dentro de un `IO`
@@ -2228,7 +2226,7 @@ Esto es similar, pero incómodo. Mira todos esos nombres temporales `w?`.
 La lección es: poner implementación `IO` en lenguajes funcionales puros es
 incómodo!
 
-Afortunamdamente, hay una mejor forma de manejar este problema. Observamos
+Afortunadamente, hay una mejor forma de manejar este problema. Observamos
 un patrón. Cada linea es de la forma:
 
 ```Haskell
