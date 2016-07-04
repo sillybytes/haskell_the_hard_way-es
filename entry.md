@@ -8,7 +8,7 @@ way](http://yannesposito.com/Scratch/en/blog/Haskell-the-Hard-Way/) por Yann
 Esposito.
 
 
-TL;DR\*: Un corto y denso tutorías para aprender Haskell.
+TL;DR\*: Un corto y denso tutorial para aprender Haskell.
 
 De verdad pienso que todos los desarrolladores deberían aprender Haskell. No
 creo que todos necesitan convertirse en ninjas de Haskell, pero deberían al
